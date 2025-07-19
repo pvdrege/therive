@@ -1,0 +1,117 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  bio       String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Intent tags for networking
+  intentTags String[] // e.g., ["yatırımarıyorum", "işarıyorum", "mentorlukarıyorum"]
+  
+  // Profile visibility and preferences
+  isActive    Boolean @default(true)
+  isPublic    Boolean @default(true)
+  profileLink String? @unique // Custom profile link
+
+  // Connections initiated by this user
+  connectionsInitiated Connection[] @relation("ConnectionInitiator")
+  // Connections received by this user
+  connectionsReceived  Connection[] @relation("ConnectionReceiver")
+
+  // Messages sent by this user
+  messagesSent     Message[] @relation("MessageSender")
+  // Messages received by this user
+  messagesReceived Message[] @relation("MessageReceiver")
+
+  @@map("users")
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Connection participants
+  initiatorId String
+  receiverId  String
+  initiator   User   @relation("ConnectionInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  receiver    User   @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  // Connection status
+  status            ConnectionStatus @default(PENDING)
+  connectionMessage String? // Initial message when requesting connection
+
+  // Privacy settings
+  initiatorSharedInfo Boolean @default(false) // Has initiator shared contact info?
+  receiverSharedInfo  Boolean @default(false) // Has receiver shared contact info?
+
+  // Messages in this connection
+  messages Message[]
+
+  @@unique([initiatorId, receiverId])
+  @@map("connections")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isRead    Boolean  @default(false)
+
+  // Message participants
+  senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  // Connection reference
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  // Message type
+  messageType MessageType @default(TEXT)
+
+  @@map("messages")
+}
+
+model IntentTag {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "yatırımarıyorum"
+  description String? // Description of the intent
+  color       String? // Hex color for UI
+  icon        String? // Icon name or emoji
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  usageCount  Int      @default(0) // Track popularity
+
+  @@map("intent_tags")
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum MessageType {
+  TEXT
+  INFO_SHARE_REQUEST
+  INFO_SHARED
+} 

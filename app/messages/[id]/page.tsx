@@ -152,54 +152,45 @@ export default function ConversationPage({ params }: MessagePageProps) {
   )
 
   return (
-    <div className="h-screen bg-therive-dark flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-700/50 bg-gray-900/50 backdrop-blur px-4 sm:px-6 py-4 shrink-0">
+    <div className="h-screen bg-therive-dark flex flex-col overflow-hidden">
+      {/* Header - Fixed */}
+      <header className="flex-shrink-0 border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-sm px-4 py-3 sticky top-0 z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <Link 
               href="/messages"
-              className="text-therive-accent hover:text-therive-accent-hover"
+              className="text-therive-accent hover:text-therive-accent-hover p-1"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
             
-            <div className="relative shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-therive-dark" />
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-therive-dark" />
+                </div>
+                {mockConversation.isOnline && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900"></div>
+                )}
               </div>
-              {mockConversation.isOnline && (
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900"></div>
-              )}
-            </div>
-            
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-therive-text truncate">{mockConversation.name}</h2>
-              <p className="text-xs text-gray-400">
-                {mockConversation.isOnline ? 'Çevrimiçi' : 'Son görülme: 2 sa önce'}
-              </p>
+              
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold text-therive-text text-sm truncate">{mockConversation.name}</h2>
+                <p className="text-xs text-gray-400 truncate">
+                  {mockConversation.isOnline ? 'Çevrimiçi' : 'Son görülme: 2 sa önce'}
+                </p>
+              </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" className="p-2">
               <Phone className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
+            <Button variant="ghost" size="sm" className="p-2">
               <Video className="w-4 h-4" />
             </Button>
-            {!mockConversation.infoShared && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowInfoShare(true)}
-                className="hidden sm:flex"
-              >
-                <Info className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Bilgileri Paylaş</span>
-              </Button>
-            )}
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="p-2">
               <MoreVertical className="w-4 h-4" />
             </Button>
           </div>
@@ -212,7 +203,7 @@ export default function ConversationPage({ params }: MessagePageProps) {
               variant="outline"
               size="sm"
               onClick={() => setShowInfoShare(true)}
-              className="w-full"
+              className="w-full text-xs"
             >
               <Info className="w-4 h-4 mr-2" />
               Bilgileri Paylaş
@@ -221,42 +212,58 @@ export default function ConversationPage({ params }: MessagePageProps) {
         )}
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-        <AnimatePresence>
-          {messages.map(message => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${message.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                  message.senderId === 'me'
-                    ? 'bg-therive-accent text-therive-dark ml-4'
-                    : 'bg-gray-700 text-therive-text mr-4'
-                }`}
+      {/* Messages Container - Scrollable */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="p-4 space-y-4 pb-6">
+          <AnimatePresence>
+            {messages.map(message => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${message.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
               >
-                <p className="text-sm leading-relaxed break-words">{message.content}</p>
-                <div className="flex items-center justify-end gap-1 mt-2">
-                  <Clock className="w-3 h-3 opacity-60" />
-                  <span className="text-xs opacity-60">
-                    {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
+                <div
+                  className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                    message.senderId === 'me'
+                      ? 'bg-therive-accent text-therive-dark rounded-br-md'
+                      : 'bg-gray-700 text-therive-text rounded-bl-md'
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+                  <div className="flex items-center justify-end gap-1 mt-2">
+                    <Clock className="w-3 h-3 opacity-60" />
+                    <span className="text-xs opacity-60">
+                      {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        <div ref={messagesEndRef} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Message Input */}
-      <div className="border-t border-gray-700/30 p-4 bg-gray-900/30 backdrop-blur shrink-0">
+      {/* Message Input - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-gray-700/50 bg-gray-900/80 backdrop-blur-sm p-4 sticky bottom-0">
+        {!mockConversation.infoShared && (
+          <div className="mb-3 hidden sm:block">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInfoShare(true)}
+              className="text-xs"
+            >
+              <Info className="w-4 h-4 mr-2" />
+              Bilgileri Paylaş
+            </Button>
+          </div>
+        )}
+        
         <div className="flex items-end gap-3 max-w-4xl mx-auto">
           <div className="flex-1">
             <textarea
@@ -264,7 +271,7 @@ export default function ConversationPage({ params }: MessagePageProps) {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Mesajınızı yazın..."
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none resize-none"
+              className="w-full bg-gray-800 border border-gray-600 rounded-2xl px-4 py-3 text-therive-text placeholder-gray-400 focus:border-therive-accent focus:outline-none resize-none transition-colors"
               rows={1}
               style={{ minHeight: '48px', maxHeight: '120px' }}
             />
@@ -273,7 +280,7 @@ export default function ConversationPage({ params }: MessagePageProps) {
             onClick={handleSendMessage}
             disabled={!newMessage.trim()}
             size="lg"
-            className="shrink-0"
+            className="shrink-0 rounded-xl px-4"
           >
             <Send className="w-4 h-4" />
           </Button>

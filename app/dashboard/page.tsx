@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { AnimatePresence } from 'framer-motion'
 
 // Mock data
 const mockStats = {
@@ -139,14 +140,14 @@ export default function DashboardPage() {
                 {/* Notifications Dropdown */}
                 {showNotifications && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50"
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 top-12 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50"
                   >
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-therive-text text-sm sm:text-base">Bildirimler</h3>
+                    <div className="p-4 border-b border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-therive-text">Bildirimler</h3>
                         <button
                           onClick={() => setShowNotifications(false)}
                           className="text-gray-400 hover:text-therive-text"
@@ -154,48 +155,29 @@ export default function DashboardPage() {
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                      
-                      <div className="space-y-3">
-                        {notifications.slice(0, 3).map(notification => (
-                          <div
-                            key={notification.id}
-                            className={`p-3 rounded-lg transition-colors cursor-pointer ${
-                              notification.unread ? 'bg-therive-accent/10 hover:bg-therive-accent/20' : 'bg-gray-700/30 hover:bg-gray-700/50'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-xs sm:text-sm font-medium text-therive-text mb-1">
-                                  {notification.title}
-                                </h4>
-                                <p className="text-xs text-gray-400 mb-2 break-words">{notification.message}</p>
-                                <span className="text-xs text-gray-500">{notification.time}</span>
-                              </div>
-                              {notification.unread && (
-                                <div className="w-2 h-2 bg-therive-accent rounded-full flex-shrink-0 mt-1"></div>
-                              )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifications.map(notification => (
+                        <div
+                          key={notification.id}
+                          className={`p-4 border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors ${
+                            notification.unread ? 'bg-therive-accent/5' : ''
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium text-therive-text mb-1">
+                                {notification.title}
+                              </h4>
+                              <p className="text-xs text-gray-400 mb-2 break-words">{notification.message}</p>
+                              <span className="text-xs text-gray-500">{notification.time}</span>
                             </div>
+                            {notification.unread && (
+                              <div className="w-2 h-2 bg-therive-accent rounded-full flex-shrink-0 mt-1"></div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                      
-                      <div className="border-t border-gray-700 mt-4 pt-4 space-y-2">
-                        <div className="flex gap-2">
-                          <Link href="/notifications" className="flex-1">
-                            <Button variant="ghost" size="sm" className="w-full text-therive-accent hover:underline text-xs sm:text-sm">
-                              Tüm Bildirimleri Gör
-                            </Button>
-                          </Link>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={markAllAsRead}
-                            className="text-gray-400 hover:text-therive-text"
-                          >
-                            <CheckCheck className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </Button>
                         </div>
-                      </div>
+                      ))}
                     </div>
                   </motion.div>
                 )}
@@ -209,12 +191,15 @@ export default function DashboardPage() {
                 )}
               </div>
               
-              <button className="p-2 text-gray-400 hover:text-therive-accent transition-colors">
-                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                <User className="w-3 h-3 sm:w-4 sm:h-4 text-therive-dark" />
-              </div>
+              <Link href="/settings">
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                </Button>
+              </Link>
+              
+              <Button variant="ghost" size="sm">
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
             </div>
           </div>
 
@@ -357,7 +342,7 @@ export default function DashboardPage() {
                     Yeni Kişiler Keşfet
                   </Button>
                 </Link>
-                <Link href="/profile/edit">
+                <Link href="/profile/1">
                   <Button variant="outline" className="w-full justify-start text-xs sm:text-sm">
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                     Profili Düzenle

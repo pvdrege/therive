@@ -1,55 +1,71 @@
-# Therive.io
+# TheRive - Professional Networking Platform
 
-## 🚀 Modern Professional Networking Platform
+A modern networking platform built with Next.js 14, TypeScript, Prisma, and Railway.
 
-Therive.io, hedef odaklı bağlantılar kurmanıza yardımcı olan profesyonel networking platformudur.
+## 🚀 Quick Deploy on Railway
 
-### 🛠️ Technology Stack
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app)
 
-- **Frontend:** Next.js 14, React, TypeScript
-- **Styling:** Tailwind CSS
-- **Database:** PostgreSQL (Supabase)
-- **Authentication:** NextAuth.js
-- **Deployment:** Vercel
+### 1. One-Click Deploy:
+- Click "Deploy on Railway" 
+- Connect your GitHub account
+- Select this repository
+- Railway will automatically provision PostgreSQL
 
-### 📦 Installation
+### 2. Set Environment Variables in Railway Dashboard:
+```
+JWT_SECRET=your-super-secure-jwt-secret-32-chars-min
+NEXTAUTH_SECRET=your-super-secure-nextauth-secret
+NEXTAUTH_URL=${{RAILWAY_PUBLIC_DOMAIN}}
+```
+
+### 3. Railway Auto-Configuration:
+- ✅ PostgreSQL Database (automatically connected)
+- ✅ Build & Deploy (Nixpacks)
+- ✅ SSL Certificate
+- ✅ Custom Domain Support
+
+---
+
+## 🛠️ Local Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/therive-app.git
-
 # Install dependencies
 npm install
 
-# Set up environment variables
-cp .env.example .env
+# Setup database
+npx prisma db push
+npx prisma generate
 
-# Run development server
+# Start development server
 npm run dev
 ```
 
-### 🌍 Environment Variables
+Visit [http://localhost:3000](http://localhost:3000)
 
+---
+
+## 📦 Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Database**: PostgreSQL (Railway)
+- **ORM**: Prisma
+- **Authentication**: NextAuth.js + JWT
+- **Styling**: Tailwind CSS
+- **Deployment**: Railway
+
+## 🔧 Environment Variables
+
+Create `.env` file:
 ```env
-DATABASE_URL=
-DIRECT_URL=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-JWT_SECRET=
-NEXTAUTH_URL=
-NEXTAUTH_SECRET=
+DATABASE_URL="postgresql://user:pass@host:port/db"
+JWT_SECRET="your-jwt-secret"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-nextauth-secret"
 ```
 
-### 🚀 Deployment
+---
 
-Bu proje Vercel ve Supabase kullanılarak deploy edilmiştir.
+## 📄 License
 
-1. Supabase projesi oluşturun
-2. Environment variables'ı Vercel'e ekleyin
-3. Deploy edin
-
-Detaylı deployment talimatları için `DEPLOYMENT.md` dosyasına bakın.
-
-### 📝 License
-
-MIT License - Detaylar için `LICENSE` dosyasına bakın.
+This project is licensed under the MIT License.

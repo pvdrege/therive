@@ -1,0 +1,25 @@
+=== VERCEL ENVIRONMENT VARIABLES ===
+
+DATABASE_URL:
+postgresql://postgres.ehdmadmwgefgciwuvoab:SecurePassword123@aws-0-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+
+DIRECT_URL:
+postgresql://postgres.ehdmadmwgefgciwuvoab:SecurePassword123@aws-0-us-west-1.pooler.supabase.com:5432/postgres
+
+NEXT_PUBLIC_SUPABASE_URL:
+https://ehdmadmwgefgciwuvoab.supabase.co
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoZG1hZG13Z2VmZ2Npd3V2b2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMDY5MDAsImV4cCI6MjA2ODU4MjkwMH0.R2eAvrSUkPoQ9JxMMowNZNqb_1CceI9eWcFBj_TqtRI
+
+JWT_SECRET:
+NewJWTSecret2024SecureKey!
+
+NEXTAUTH_SECRET:
+new-super-secret-nextauth-key-2024
+
+=== Production NEXTAUTH_URL ===
+https://your-vercel-app-url.vercel.app (Bu deployment sonrası güncellenecek)
+
+=== Preview & Development NEXTAUTH_URL ===
+http://localhost:3000

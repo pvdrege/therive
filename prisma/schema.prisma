@@ -1,85 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
 }
 
-model connections {
-  id                                   String           @id
-  createdAt                            DateTime         @default(now())
-  updatedAt                            DateTime
-  initiatorId                          String
-  receiverId                           String
-  status                               ConnectionStatus @default(PENDING)
-  connectionMessage                    String?
-  initiatorSharedInfo                  Boolean          @default(false)
-  receiverSharedInfo                   Boolean          @default(false)
-  users_connections_initiatorIdTousers users            @relation("connections_initiatorIdTousers", fields: [initiatorId], references: [id], onDelete: Cascade)
-  users_connections_receiverIdTousers  users            @relation("connections_receiverIdTousers", fields: [receiverId], references: [id], onDelete: Cascade)
-  messages                             messages[]
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  name        String
+  bio         String?
+  location    String?
+  profileLink String   @unique @map("profileLink")
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  initiatedConnections Connection[] @relation("Initiator")
+  receivedConnections  Connection[] @relation("Receiver")
+  sentMessages         Message[]    @relation("Sender")
+  receivedMessages     Message[]    @relation("Recipient")
+  notifications        Notification[]
+
+  @@map("users")
+}
+
+model Connection {
+  id          String            @id @default(cuid())
+  initiatorId String            @map("initiatorId")
+  receiverId  String            @map("receiverId")
+  status      ConnectionStatus  @default(PENDING)
+  intent      String
+  message     String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relationships
+  initiator User @relation("Initiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  receiver  User @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@unique([initiatorId, receiverId])
+  @@map("connections")
 }
 
-model intent_tags {
-  id          String   @id
-  name        String   @unique
-  description String?
-  color       String?
-  icon        String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  usageCount  Int      @default(0)
+model Message {
+  id           String      @id @default(cuid())
+  content      String
+  senderId     String      @map("senderId")
+  recipientId  String      @map("recipientId")
+  connectionId String      @map("connectionId")
+  readAt       DateTime?
+  createdAt    DateTime    @default(now())
+
+  // Relationships
+  sender    User @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
 }
 
-model messages {
-  id                               String      @id
-  content                          String
-  createdAt                        DateTime    @default(now())
-  updatedAt                        DateTime
-  isRead                           Boolean     @default(false)
-  senderId                         String
-  receiverId                       String
-  connectionId                     String
-  messageType                      MessageType @default(TEXT)
-  connections                      connections @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  users_messages_receiverIdTousers users       @relation("messages_receiverIdTousers", fields: [receiverId], references: [id], onDelete: Cascade)
-  users_messages_senderIdTousers   users       @relation("messages_senderIdTousers", fields: [senderId], references: [id], onDelete: Cascade)
-}
-
-model notifications {
-  id        String           @id
-  userId    String
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("userId")
   type      NotificationType
   title     String
   content   String
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
-  data      Json?
-  users     users            @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
 
-model users {
-  id                                         String          @id
-  email                                      String          @unique
-  name                                       String
-  password                                   String
-  bio                                        String?
-  avatar                                     String?
-  createdAt                                  DateTime        @default(now())
-  updatedAt                                  DateTime
-  intentTags                                 String[]
-  isActive                                   Boolean         @default(true)
-  isPublic                                   Boolean         @default(true)
-  profileLink                                String?         @unique
-  connections_connections_initiatorIdTousers connections[]   @relation("connections_initiatorIdTousers")
-  connections_connections_receiverIdTousers  connections[]   @relation("connections_receiverIdTousers")
-  messages_messages_receiverIdTousers        messages[]      @relation("messages_receiverIdTousers")
-  messages_messages_senderIdTousers          messages[]      @relation("messages_senderIdTousers")
-  notifications                              notifications[]
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 enum ConnectionStatus {
@@ -89,17 +89,9 @@ enum ConnectionStatus {
   BLOCKED
 }
 
-enum MessageType {
-  TEXT
-  INFO_SHARE_REQUEST
-  INFO_SHARED
-}
-
 enum NotificationType {
-  PROFILE_UPDATED
-  PASSWORD_CHANGED
-  NEW_CONNECTION_REQUEST
+  CONNECTION_REQUEST
   CONNECTION_ACCEPTED
-  NEW_MESSAGE
-  SYSTEM_ANNOUNCEMENT
+  MESSAGE_RECEIVED
+  PROFILE_VIEW
 }

@@ -16,19 +16,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { 
-        email: email.toLowerCase().trim() 
-      }
-    })
+    // Find user in database with password using raw query to avoid TypeScript issues
+    const userResult = await prisma.$queryRaw`
+      SELECT id, email, name, password, bio, avatar, "createdAt", "updatedAt", "intentTags", "isActive", "isPublic", "profileLink" 
+      FROM users WHERE email = ${email.toLowerCase().trim()}
+    ` as Array<{
+      id: string;
+      email: string;
+      name: string;
+      password: string;
+      bio: string | null;
+      avatar: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      intentTags: string[];
+      isActive: boolean;
+      isPublic: boolean;
+      profileLink: string | null;
+    }>
 
-    if (!user) {
+    if (!userResult || userResult.length === 0) {
       return NextResponse.json(
         { error: 'Geçersiz e-posta veya şifre' },
         { status: 401 }
       )
     }
+
+    const user = userResult[0]
 
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password)

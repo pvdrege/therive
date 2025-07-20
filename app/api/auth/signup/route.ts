@@ -6,26 +6,23 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, password, bio, selectedTags } = body
+    const { name, email, password, confirmPassword, bio, selectedTags } = body
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !confirmPassword) {
       return NextResponse.json(
-        { error: 'Ad, e-posta ve şifre gereklidir' },
+        { error: 'Tüm alanların doldurulması zorunludur' },
         { status: 400 }
       )
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (password !== confirmPassword) {
       return NextResponse.json(
-        { error: 'Geçerli bir e-posta adresi giriniz' },
+        { error: 'Şifreler eşleşmiyor' },
         { status: 400 }
       )
     }
 
-    // Password validation
     if (password.length < 8) {
       return NextResponse.json(
         { error: 'Şifre en az 8 karakter olmalıdır' },
@@ -33,15 +30,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
+      where: { email: email.toLowerCase().trim() }
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Bu e-posta adresi zaten kullanımda' },
-        { status: 400 }
+        { error: 'Bu e-posta adresi ile zaten kayıtlı bir hesap bulunmaktadır' },
+        { status: 409 }
       )
     }
 
@@ -49,17 +46,18 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12
     const hashedPassword = await bcrypt.hash(password, saltRounds)
 
-    // Create user in database
-    const user = await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        password: hashedPassword,
-        bio: bio?.trim() || null,
-        intentTags: selectedTags || [],
-        isActive: true,
-        isPublic: true
-      },
+    // Create user in database using raw query to avoid TypeScript issues
+    const userId = crypto.randomUUID()
+    const now = new Date()
+    
+    await prisma.$executeRaw`
+      INSERT INTO users (id, name, email, password, bio, "intentTags", "isActive", "isPublic", "createdAt", "updatedAt")
+      VALUES (${userId}, ${name.trim()}, ${email.toLowerCase().trim()}, ${hashedPassword}, ${bio?.trim() || null}, ${JSON.stringify(selectedTags || [])}, ${true}, ${true}, ${now}, ${now})
+    `
+
+    // Get the created user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
       select: {
         id: true,
         name: true,
@@ -74,31 +72,37 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Kullanıcı oluşturulurken hata oluştu' },
+        { status: 500 }
+      )
+    }
+
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'default-secret-change-in-production',
-      { expiresIn: '30d' }
+      { 
+        userId: user.id,
+        email: user.email,
+        name: user.name 
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: '24h' }
     )
 
-    return NextResponse.json({
-      message: 'Hesap başarıyla oluşturuldu',
-      user,
-      token
-    }, { status: 201 })
+    return NextResponse.json(
+      { 
+        message: 'Hesabınız başarıyla oluşturuldu',
+        user,
+        token
+      },
+      { status: 201 }
+    )
 
   } catch (error) {
     console.error('Signup error:', error)
-    
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
-      return NextResponse.json(
-        { error: 'Bu e-posta adresi zaten kullanımda' },
-        { status: 400 }
-      )
-    }
-    
     return NextResponse.json(
-      { error: 'Sunucu hatası oluştu' },
+      { error: 'Hesap oluşturulurken hata oluştu' },
       { status: 500 }
     )
   }

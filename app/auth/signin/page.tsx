@@ -4,43 +4,54 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { useAppStore } from '@/lib/store'
 
 export default function SignInPage() {
+  const router = useRouter()
+  const { setUser, setToken, setLoading, setError, loading, error } = useAppStore()
+  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
-  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }))
-    if (error) setError('')
+    if (error) setError(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
+    setError(null)
     
     try {
-      // TODO: API call to authenticate user
-      console.log('Signing in:', formData)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // For demo, simulate failed login for invalid credentials
-      if (formData.email === 'test@example.com' && formData.password === 'password') {
-        window.location.href = '/dashboard'
-      } else {
-        throw new Error('Geçersiz e-posta veya şifre')
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Giriş yapılamadı')
       }
+
+      // Set user and token in store
+      setUser(data.user)
+      setToken(data.token)
+
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (error: any) {
       setError(error.message || 'Giriş yapılamadı')
     } finally {
@@ -95,6 +106,7 @@ export default function SignInPage() {
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
                 placeholder="ahmet@example.com"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -112,6 +124,7 @@ export default function SignInPage() {
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-therive-text focus:border-therive-accent focus:outline-none"
                   placeholder="••••••••"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
@@ -141,22 +154,13 @@ export default function SignInPage() {
 
             <Button 
               type="submit"
-              disabled={!isFormValid}
+              disabled={!isFormValid || loading}
               loading={loading}
               className="w-full"
             >
-              Giriş Yap
+              {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </Button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 bg-therive-accent/10 border border-therive-accent/20 rounded-lg">
-            <p className="text-sm text-therive-accent font-medium mb-2">Demo Hesap</p>
-            <p className="text-xs text-gray-400">
-              E-posta: test@example.com<br />
-              Şifre: password
-            </p>
-          </div>
 
           {/* Footer */}
           <div className="text-center mt-8">

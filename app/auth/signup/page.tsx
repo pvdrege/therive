@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Check, User, Mail, Lock, Tag } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { useAppStore } from '@/lib/store'
 
 const intentTags = [
   { id: 'yatirim-ariyorum', name: '#yatırımarıyorum', color: '#10B981' },
@@ -18,6 +20,9 @@ const intentTags = [
 ]
 
 export default function SignUpPage() {
+  const router = useRouter()
+  const { setUser, setToken, setLoading, setError, loading, error } = useAppStore()
+  
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
     name: '',
@@ -26,13 +31,13 @@ export default function SignUpPage() {
     bio: '',
     selectedTags: [] as string[]
   })
-  const [loading, setLoading] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }))
+    if (error) setError(null)
   }
 
   const toggleTag = (tagId: string) => {
@@ -47,29 +52,37 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
     
     try {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(formData)
       })
 
-      if (response.ok) {
-        window.location.href = '/dashboard'
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Kayıt işlemi başarısız')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kayıt işlemi başarısız')
       }
-    } catch (error) {
-      console.error('Signup error:', error)
-      alert('Sunucu hatası')
+
+      // Set user and token in store
+      setUser(data.user)
+      setToken(data.token)
+
+      // Redirect to dashboard
+      router.push('/dashboard')
+    } catch (error: any) {
+      setError(error.message || 'Kayıt işlemi başarısız')
     } finally {
       setLoading(false)
     }
   }
 
-  const canProceedToStep2 = formData.name && formData.email && formData.password
+  const canProceedToStep2 = formData.name.trim() && formData.email.trim() && formData.password.length >= 8
   const canComplete = canProceedToStep2 && formData.selectedTags.length > 0
 
   return (
@@ -104,6 +117,17 @@ export default function SignUpPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Error Message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-600/10 border border-red-600/20 rounded-lg p-4"
+            >
+              <p className="text-red-400 text-sm">{error}</p>
+            </motion.div>
+          )}
+
           {/* Step 1: Basic Info */}
           {step === 1 && (
             <motion.div
@@ -125,6 +149,7 @@ export default function SignUpPage() {
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
                   placeholder="Ahmet Yılmaz"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -141,6 +166,7 @@ export default function SignUpPage() {
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
                   placeholder="ahmet@example.com"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -158,7 +184,9 @@ export default function SignUpPage() {
                   placeholder="••••••••"
                   minLength={8}
                   required
+                  disabled={loading}
                 />
+                <p className="text-xs text-gray-400 mt-1">En az 8 karakter olmalıdır</p>
               </div>
 
               <div>
@@ -172,6 +200,7 @@ export default function SignUpPage() {
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none resize-none"
                   placeholder="Kendini kısaca tanıt..."
                   rows={3}
+                  disabled={loading}
                 />
               </div>
 
@@ -208,6 +237,7 @@ export default function SignUpPage() {
                     key={tag.id}
                     type="button"
                     onClick={() => toggleTag(tag.id)}
+                    disabled={loading}
                     className={`p-4 rounded-lg border-2 text-sm font-medium transition-all ${
                       formData.selectedTags.includes(tag.id)
                         ? 'border-therive-accent bg-therive-accent/10 text-therive-accent'
@@ -246,17 +276,18 @@ export default function SignUpPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setStep(1)}
+                  disabled={loading}
                   className="flex-1"
                 >
                   Geri
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={!canComplete}
+                  disabled={!canComplete || loading}
                   loading={loading}
                   className="flex-1"
                 >
-                  Hesap Oluştur
+                  {loading ? 'Hesap oluşturuluyor...' : 'Hesap Oluştur'}
                 </Button>
               </div>
             </motion.div>

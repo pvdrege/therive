@@ -1,24 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-
-// Mock database - In production, use Prisma
-const users = [
-  {
-    id: 'demo-user',
-    name: 'Demo Kullanıcı',
-    email: 'test@example.com',
-    password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj95wFxVZj22', // 'password'
-    bio: 'Demo hesabı için test kullanıcısı',
-    intentTags: ['yatirim-ariyorum', 'network-ariyorum'],
-    avatar: null,
-    isActive: true,
-    isPublic: true,
-    profileLink: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-]
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +16,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find user
-    const user = users.find(u => u.email === email)
+    // Find user in database
+    const user = await prisma.user.findUnique({
+      where: { 
+        email: email.toLowerCase().trim() 
+      }
+    })
+
     if (!user) {
       return NextResponse.json(
         { error: 'Geçersiz e-posta veya şifre' },
@@ -54,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Check if user is active
     if (!user.isActive) {
       return NextResponse.json(
-        { error: 'Hesap devre dışı' },
+        { error: 'Hesabınız devre dışı bırakılmış' },
         { status: 403 }
       )
     }
@@ -62,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'default-secret',
+      process.env.JWT_SECRET || 'default-secret-change-in-production',
       { expiresIn: '30d' }
     )
 
@@ -78,7 +66,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Signin error:', error)
     return NextResponse.json(
-      { error: 'Sunucu hatası' },
+      { error: 'Sunucu hatası oluştu' },
       { status: 500 }
     )
   }

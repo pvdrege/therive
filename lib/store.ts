@@ -9,6 +9,7 @@ interface User {
   avatar?: string
   intentTags: string[]
   isActive: boolean
+  isPublic: boolean
   profileLink?: string
   createdAt: string
 }
@@ -26,110 +27,143 @@ interface Connection {
 
 interface Message {
   id: string
+  connectionId: string
   senderId: string
   receiverId: string
-  connectionId: string
   content: string
-  messageType: 'TEXT' | 'INFO_SHARE_REQUEST' | 'INFO_SHARED'
+  type: 'TEXT' | 'INFO_SHARE_REQUEST' | 'INFO_SHARED'
   isRead: boolean
   createdAt: string
 }
 
-interface AppState {
-  // Auth state
+interface AuthState {
+  token: string | null
   user: User | null
   isAuthenticated: boolean
-  token: string | null
-
-  // UI state
-  loading: boolean
-  error: string | null
-
-  // Data state
-  connections: Connection[]
-  messages: Message[]
-  users: User[]
-
-  // Actions
-  setUser: (user: User | null) => void
-  setToken: (token: string | null) => void
-  setLoading: (loading: boolean) => void
-  setError: (error: string | null) => void
+  setAuth: (token: string, user: User) => void
+  setUser: (user: User) => void
   logout: () => void
-  
-  // Connection actions
-  addConnection: (connection: Connection) => void
-  updateConnection: (id: string, updates: Partial<Connection>) => void
-  
-  // Message actions
-  addMessage: (message: Message) => void
-  markMessageAsRead: (id: string) => void
-  
-  // User actions
-  updateUser: (updates: Partial<User>) => void
-  setUsers: (users: User[]) => void
 }
 
-export const useAppStore = create<AppState>()(
+interface ConnectionsState {
+  connections: Connection[]
+  setConnections: (connections: Connection[]) => void
+  addConnection: (connection: Connection) => void
+  updateConnection: (id: string, updates: Partial<Connection>) => void
+}
+
+interface MessagesState {
+  messages: Message[]
+  setMessages: (messages: Message[]) => void
+  addMessage: (message: Message) => void
+  markAsRead: (messageIds: string[]) => void
+}
+
+interface NotificationState {
+  notifications: any[]
+  unreadCount: number
+  setNotifications: (notifications: any[]) => void
+  markNotificationAsRead: (notificationIds: string[]) => void
+  clearNotifications: () => void
+}
+
+// Main app store combining all states
+export const useAppStore = create<AuthState & ConnectionsState & MessagesState & NotificationState>()(
   persist(
     (set, get) => ({
-      // Initial state
+      // Auth state
+      token: null,
       user: null,
       isAuthenticated: false,
-      token: null,
-      loading: false,
-      error: null,
-      connections: [],
-      messages: [],
-      users: [],
-
-      // Auth actions
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setToken: (token) => set({ token }),
-      setLoading: (loading) => set({ loading }),
-      setError: (error) => set({ error }),
-      logout: () => set({
-        user: null,
+      
+      setAuth: (token: string, user: User) => set({ 
+        token, 
+        user, 
+        isAuthenticated: true 
+      }),
+      
+      setUser: (user: User) => set({ user }),
+      
+      logout: () => set({ 
+        token: null, 
+        user: null, 
         isAuthenticated: false,
-        token: null,
         connections: [],
         messages: [],
-        users: []
+        notifications: [],
+        unreadCount: 0
       }),
 
-      // Connection actions
-      addConnection: (connection) => set(state => ({
-        connections: [...state.connections, connection]
+      // Connections state
+      connections: [],
+      setConnections: (connections: Connection[]) => set({ connections }),
+      addConnection: (connection: Connection) => set((state) => ({ 
+        connections: [...state.connections, connection] 
       })),
-      updateConnection: (id, updates) => set(state => ({
-        connections: state.connections.map(conn =>
+      updateConnection: (id: string, updates: Partial<Connection>) => set((state) => ({ 
+        connections: state.connections.map(conn => 
           conn.id === id ? { ...conn, ...updates } : conn
         )
       })),
 
-      // Message actions
-      addMessage: (message) => set(state => ({
-        messages: [...state.messages, message]
+      // Messages state  
+      messages: [],
+      setMessages: (messages: Message[]) => set({ messages }),
+      addMessage: (message: Message) => set((state) => ({ 
+        messages: [...state.messages, message] 
       })),
-      markMessageAsRead: (id) => set(state => ({
+      markAsRead: (messageIds: string[]) => set((state) => ({
         messages: state.messages.map(msg =>
-          msg.id === id ? { ...msg, isRead: true } : msg
+          messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
         )
       })),
 
-      // User actions
-      updateUser: (updates) => set(state => ({
-        user: state.user ? { ...state.user, ...updates } : null
+      // Notifications state
+      notifications: [],
+      unreadCount: 0,
+      setNotifications: (notifications: any[]) => set({ notifications }),
+      markNotificationAsRead: (notificationIds: string[]) => set((state) => ({
+        notifications: state.notifications.map(notif =>
+          notificationIds.includes(notif.id) ? { ...notif, isRead: true } : notif
+        ),
+        unreadCount: Math.max(0, state.unreadCount - notificationIds.length)
       })),
-      setUsers: (users) => set({ users })
+      clearNotifications: () => set({ notifications: [], unreadCount: 0 })
     }),
     {
       name: 'therive-store',
       partialize: (state) => ({
+        token: state.token,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        token: state.token
       })
     }
   )
-) 
+)
+
+// Separate stores for non-persisted data
+export const useConnectionsStore = create<ConnectionsState>((set) => ({
+  connections: [],
+  setConnections: (connections: Connection[]) => set({ connections }),
+  addConnection: (connection: Connection) => set((state) => ({ 
+    connections: [...state.connections, connection] 
+  })),
+  updateConnection: (id: string, updates: Partial<Connection>) => set((state) => ({ 
+    connections: state.connections.map(conn => 
+      conn.id === id ? { ...conn, ...updates } : conn
+    )
+  }))
+}))
+
+export const useMessagesStore = create<MessagesState>((set) => ({
+  messages: [],
+  setMessages: (messages: Message[]) => set({ messages }),
+  addMessage: (message: Message) => set((state) => ({ 
+    messages: [...state.messages, message] 
+  })),
+  markAsRead: (messageIds: string[]) => set((state) => ({
+    messages: state.messages.map(msg =>
+      messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+    )
+  }))
+})) 

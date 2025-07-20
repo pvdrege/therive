@@ -10,10 +10,11 @@ export interface ButtonProps
   size?: "default" | "sm" | "lg" | "icon"  
   loading?: boolean
   children?: React.ReactNode
+  type?: "button" | "submit" | "reset"
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "default", size = "default", loading = false, children, disabled, ...props }, ref) => {
+  ({ className, variant = "default", size = "default", loading = false, children, disabled, type, onClick, ...props }, ref) => {
     const variants = {
       default: "bg-therive-accent hover:bg-therive-accent-hover text-therive-dark font-semibold",
       destructive: "bg-red-600 hover:bg-red-700 text-white",
@@ -30,10 +31,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       icon: "h-10 w-10",
     }
 
-    const MotionButton = motion.button
-
     return (
-      <MotionButton
+      <motion.button
         whileTap={{ scale: 0.98 }}
         className={cn(
           "inline-flex items-center justify-center rounded-lg font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 btn-hover",
@@ -44,7 +43,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         ref={ref}
         disabled={disabled || loading}
-        type="button"
+        type={type}
+        onClick={onClick}
         {...(props as any)}
       >
         {loading ? (
@@ -55,7 +55,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ) : (
           children
         )}
-      </MotionButton>
+      </motion.button>
     )
   }
 )

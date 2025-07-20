@@ -10,7 +10,7 @@ const protectedRoutes = [
   '/settings'
 ]
 
-// Public routes that redirect to dashboard if user is already authenticated
+// Public routes that redirect to dashboard if user is already authenticated  
 const authRoutes = [
   '/auth/signin',
   '/auth/signup'
@@ -19,25 +19,20 @@ const authRoutes = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Get token from cookies or local storage (we'll use a custom header for client-side)
-  const authHeader = request.headers.get('authorization')
-  const hasToken = authHeader?.startsWith('Bearer ')
+  // Get token from cookies (Zustand persist stores in localStorage, but we need a different approach)
+  // For now, we'll skip middleware token check for client-side navigation
+  // and let AuthWrapper handle it
+  const cookieToken = request.cookies.get('therive-token')?.value
   
   // Check if current route is protected
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
-  // Check if current route is auth route
+  // Check if current route is auth route  
   const isAuthRoute = authRoutes.includes(pathname)
   
-  // If trying to access protected route without token, redirect to signin
-  if (isProtectedRoute && !hasToken) {
-    return NextResponse.redirect(new URL('/auth/signin', request.url))
-  }
-  
-  // If trying to access auth routes with token, redirect to dashboard
-  if (isAuthRoute && hasToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  // Skip middleware checks for now - let AuthWrapper handle auth
+  // This allows proper client-side navigation
+  console.log('Middleware bypassed for client navigation:', pathname)
   
   return NextResponse.next()
 }

@@ -38,6 +38,9 @@ model User {
   // Messages received by this user
   messagesReceived Message[] @relation("MessageReceiver")
 
+  // Notifications for this user
+  notifications    Notification[]
+
   @@map("users")
 }
 
@@ -104,6 +107,24 @@ model IntentTag {
   @@map("intent_tags")
 }
 
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   // User who receives the notification
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String   // e.g., "Profil güncellendi"
+  content   String   // e.g., "Bio bilginiz başarıyla güncellendi"
+  
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  // Optional data for different notification types
+  data      Json?    // Extra data like user id, connection id, etc.
+  
+  @@map("notifications")
+}
+
 enum ConnectionStatus {
   PENDING
   ACCEPTED
@@ -115,4 +136,13 @@ enum MessageType {
   TEXT
   INFO_SHARE_REQUEST
   INFO_SHARED
+}
+
+enum NotificationType {
+  PROFILE_UPDATED
+  PASSWORD_CHANGED
+  NEW_CONNECTION_REQUEST
+  CONNECTION_ACCEPTED
+  NEW_MESSAGE
+  SYSTEM_ANNOUNCEMENT
 } 

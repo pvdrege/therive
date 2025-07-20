@@ -19,6 +19,7 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Input change:', e.target.name, e.target.value) // DEBUG
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -28,10 +29,12 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('🚀 FORM SUBMITTED!', formData) // DEBUG
     setLoading(true)
     setError(null)
     
     try {
+      console.log('📡 Sending API request...') // DEBUG
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
@@ -40,19 +43,27 @@ export default function SignInPage() {
         body: JSON.stringify(formData),
       })
 
+      console.log('📨 API Response:', response.status, response.ok) // DEBUG
       const data = await response.json()
+      console.log('📦 Response data:', data) // DEBUG
 
       if (!response.ok) {
         throw new Error(data.error || 'Giriş yapılamadı')
       }
 
       // Set user and token in store
+      console.log('✅ Setting user and token in store') // DEBUG
       setUser(data.user)
       setToken(data.token)
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Wait for state to update before redirect
+      console.log('⏳ Waiting for state update...') // DEBUG
+      setTimeout(() => {
+        console.log('🏠 Redirecting to dashboard') // DEBUG
+        router.push('/dashboard')
+      }, 100)
     } catch (error: any) {
+      console.error('❌ Login error:', error) // DEBUG
       setError(error.message || 'Giriş yapılamadı')
     } finally {
       setLoading(false)
@@ -60,6 +71,7 @@ export default function SignInPage() {
   }
 
   const isFormValid = formData.email && formData.password
+  console.log('Form valid:', isFormValid, 'Loading:', loading) // DEBUG
 
   return (
     <main className="min-h-screen bg-therive-dark flex items-center justify-center px-4">

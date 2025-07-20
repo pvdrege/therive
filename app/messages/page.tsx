@@ -16,524 +16,388 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useAppStore } from '@/lib/store'
+import AuthWrapper from '@/components/AuthWrapper'
 
-// Mock data
-const mockConversations = [
-  {
-    id: '1',
-    name: 'Ahmet Kaya',
-    lastMessage: 'Merhaba, projeni çok beğendim!',
-    lastMessageTime: '2 dk',
-    unreadCount: 2,
-    isOnline: true,
-    infoShared: false,
-    avatar: null
-  },
-  {
-    id: '2',
-    name: 'Elif Demir',
-    lastMessage: 'Yarın toplantı yapabilir miyiz?',
-    lastMessageTime: '1 sa',
-    unreadCount: 0,
-    isOnline: false,
-    infoShared: true,
-    avatar: null
-  },
-  {
-    id: '3',
-    name: 'Mehmet Özkan',
-    lastMessage: 'Harika bir fikir, konuşalım',
-    lastMessageTime: '3 sa',
-    unreadCount: 1,
-    isOnline: true,
-    infoShared: false,
-    avatar: null
+interface Conversation {
+  id: string
+  userId: string
+  name: string
+  email: string
+  avatar: string | null
+  isOnline: boolean
+  lastMessage: {
+    content: string
+    createdAt: string
+    isFromMe: boolean
+  } | null
+  unreadCount: number
+  infoShared: boolean
+}
+
+interface Message {
+  id: string
+  content: string
+  createdAt: string
+  senderId: string
+  sender: {
+    id: string
+    name: string
+    avatar: string | null
   }
-]
+}
 
-const mockMessages = [
-  {
-    id: '1',
-    senderId: '1',
-    content: 'Merhaba! Profilinizi gördüm, çok etkileyici projeler yapıyorsunuz.',
-    timestamp: '2024-01-15T10:00:00Z',
-    type: 'text'
-  },
-  {
-    id: '2',
-    senderId: 'me',
-    content: 'Teşekkür ederim! Sizin de e-ticaret alanındaki deneyiminiz çok değerli.',
-    timestamp: '2024-01-15T10:05:00Z',
-    type: 'text'
-  },
-  {
-    id: '3',
-    senderId: '1',
-    content: 'Belki bir kahve içip deneyimlerimizi paylaşabiliriz?',
-    timestamp: '2024-01-15T10:10:00Z',
-    type: 'text'
-  },
-  {
-    id: '4',
-    senderId: 'me',
-    content: 'Harika fikir! Bu hafta müsait misiniz?',
-    timestamp: '2024-01-15T10:15:00Z',
-    type: 'text'
-  }
-]
-
-export default function MessagesPage() {
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
+function MessagesContent() {
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [selectedChat, setSelectedChat] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showInfoShare, setShowInfoShare] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const { user, token } = useAppStore()
 
+  // Fetch conversations on component mount
   useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-      if (window.innerWidth >= 768) {
-        setShowSidebar(true)
-        if (!selectedConversation) {
-          setSelectedConversation('1') // Auto-select first conversation on desktop
+    fetchConversations()
+  }, [])
+
+  const fetchConversations = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/messages', {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      } else {
-        setShowSidebar(false)
+      })
+
+      if (!response.ok) {
+        throw new Error('Konuşmalar yüklenemedi')
       }
+
+      const data = await response.json()
+      setConversations(data.conversations)
+    } catch (error) {
+      console.error('Error fetching conversations:', error)
+    } finally {
+      setLoading(false)
     }
-    
-    checkIsMobile()
-    window.addEventListener('resize', checkIsMobile)
-    return () => window.removeEventListener('resize', checkIsMobile)
-  }, [selectedConversation])
+  }
 
-  const activeConversation = mockConversations.find(c => c.id === selectedConversation)
+  // Fetch messages for selected conversation
+  const fetchMessages = async (connectionId: string) => {
+    try {
+      const response = await fetch(`/api/messages/${connectionId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      // TODO: Send message via socket
-      console.log('Sending message:', newMessage)
+      if (!response.ok) {
+        throw new Error('Mesajlar yüklenemedi')
+      }
+
+      const data = await response.json()
+      setMessages(data.messages)
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+    }
+  }
+
+  // Send new message
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat || sending) return
+
+    try {
+      setSending(true)
+      const response = await fetch(`/api/messages/${selectedChat}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: newMessage.trim() })
+      })
+
+      if (!response.ok) {
+        throw new Error('Mesaj gönderilemedi')
+      }
+
+      const data = await response.json()
+      setMessages(prev => [...prev, data.message])
       setNewMessage('')
+      
+      // Update conversation list
+      await fetchConversations()
+    } catch (error) {
+      console.error('Error sending message:', error)
+    } finally {
+      setSending(false)
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
+  const handleChatSelect = (conversationId: string) => {
+    setSelectedChat(conversationId)
+    fetchMessages(conversationId)
   }
 
-  const handleSelectConversation = (conversationId: string) => {
-    setSelectedConversation(conversationId)
-    if (isMobile) {
-      setShowSidebar(false)
-    }
-  }
-
-  const handleBackToList = () => {
-    if (isMobile) {
-      setSelectedConversation(null)
-      setShowSidebar(true)
-    }
-  }
-
-  const InfoShareModal = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md"
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <Shield className="w-8 h-8 text-therive-accent" />
-          <div>
-            <h3 className="text-xl font-semibold text-therive-text">Bilgileri Paylaş</h3>
-            <p className="text-sm text-gray-400">Güvenli bilgi paylaşımı</p>
-          </div>
-        </div>
-        
-        <p className="text-gray-300 mb-6 leading-relaxed">
-          <strong className="text-therive-text">{activeConversation?.name}</strong> ile iletişim bilgilerinizi paylaşmak istediğinizi onaylayın. 
-          Bu işlem karşılıklı onay gerektirir.
-        </p>
-
-        <div className="bg-therive-accent/10 border border-therive-accent/20 rounded-lg p-4 mb-6">
-          <h4 className="text-therive-accent font-medium mb-2">Paylaşılacak Bilgiler:</h4>
-          <ul className="text-sm text-gray-300 space-y-1">
-            <li>• E-posta adresi</li>
-            <li>• Telefon numarası (opsiyonel)</li>
-            <li>• LinkedIn profili (opsiyonel)</li>
-          </ul>
-        </div>
-
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setShowInfoShare(false)}
-            className="flex-1"
-          >
-            İptal
-          </Button>
-          <Button
-            onClick={() => {
-              setShowInfoShare(false)
-              // TODO: Request info share
-            }}
-            className="flex-1"
-          >
-            Bilgileri Paylaş
-          </Button>
-        </div>
-      </motion.div>
-    </div>
+  const selectedConversation = conversations.find(c => c.id === selectedChat)
+  
+  const filteredConversations = conversations.filter(conv => 
+    conv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    conv.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffMins < 1) return 'Şimdi'
+    if (diffMins < 60) return `${diffMins} dk`
+    if (diffHours < 24) return `${diffHours} sa`
+    return `${diffDays} gün`
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-therive-dark flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-therive-accent"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="h-screen bg-therive-dark flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-700/50 bg-gray-900/50 backdrop-blur px-4 sm:px-6 py-4 relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {isMobile && selectedConversation ? (
-              <button
-                onClick={handleBackToList}
-                className="text-therive-accent hover:text-therive-accent-hover"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            ) : (
+    <main className="min-h-screen bg-therive-dark text-therive-text">
+      <div className="flex h-screen">
+        {/* Sidebar - Conversations List */}
+        <div className={`bg-gray-800/50 border-r border-gray-700 w-full md:w-80 flex flex-col ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+          {/* Header */}
+          <div className="p-4 border-b border-gray-700">
+            <div className="flex items-center justify-between mb-4">
               <Link 
                 href="/dashboard"
-                className="text-therive-accent hover:text-therive-accent-hover"
+                className="inline-flex items-center gap-2 text-therive-accent hover:text-therive-accent-hover"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" />
+                Dashboard
               </Link>
-            )}
-            
-            <div className="flex items-center gap-3">
-              {isMobile && !selectedConversation && (
-                <button
-                  onClick={() => setShowSidebar(!showSidebar)}
-                  className="text-therive-text md:hidden"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
-              )}
-              
-              <h1 className="text-lg sm:text-xl font-semibold text-therive-text">
-                {isMobile && selectedConversation && activeConversation
-                  ? activeConversation.name
-                  : 'Mesajlar'
-                }
-              </h1>
+              <h1 className="text-xl font-bold">Mesajlar</h1>
             </div>
-          </div>
-          
-          {isMobile && selectedConversation && activeConversation && (
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-therive-dark" />
-                </div>
-                {activeConversation.isOnline && (
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900"></div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Mobile Sidebar Overlay */}
-        {isMobile && showSidebar && (
-          <div 
-            className="absolute inset-0 bg-black/50 z-20 md:hidden"
-            onClick={() => setShowSidebar(false)}
-          />
-        )}
-
-        {/* Conversations Sidebar */}
-        <div className={`
-          ${isMobile ? 'absolute left-0 top-0 bottom-0 z-30 w-80 max-w-[85vw]' : 'w-80 relative'} 
-          ${(!showSidebar && !isMobile) ? 'hidden' : ''}
-          ${isMobile && !showSidebar ? 'hidden' : ''}
-          bg-therive-dark border-r border-gray-700/50 flex flex-col
-        `}>
-          {/* Close button for mobile */}
-          {isMobile && (
-            <div className="flex justify-end p-4 border-b border-gray-700/30">
-              <button
-                onClick={() => setShowSidebar(false)}
-                className="text-gray-400 hover:text-therive-text"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-          
-          {/* Search */}
-          <div className="p-4 border-b border-gray-700/30">
+            {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Konuşma ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-sm text-therive-text focus:border-therive-accent focus:outline-none"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Konuşmaları ara..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent"
               />
             </div>
           </div>
 
-          {/* Conversations List */}
+          {/* Conversations */}
           <div className="flex-1 overflow-y-auto">
-            {mockConversations.map(conversation => (
-              <div
-                key={conversation.id}
-                onClick={() => handleSelectConversation(conversation.id)}
-                className={`p-4 cursor-pointer transition-colors ${
-                  selectedConversation === conversation.id
-                    ? 'bg-therive-accent/10 border-r-2 border-therive-accent'
-                    : 'hover:bg-gray-700/30'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="w-12 h-12 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-therive-dark" />
-                    </div>
-                    {conversation.isOnline && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-gray-900"></div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-medium text-therive-text truncate">
-                        {conversation.name}
-                      </h3>
-                      <span className="text-xs text-gray-400">{conversation.lastMessageTime}</span>
-                    </div>
-                    <p className="text-sm text-gray-400 truncate">{conversation.lastMessage}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      {conversation.infoShared && (
-                        <div className="flex items-center gap-1 text-xs text-therive-accent">
-                          <Shield className="w-3 h-3" />
-                          <span className="hidden sm:inline">Bilgiler paylaşıldı</span>
-                        </div>
-                      )}
-                      {conversation.unreadCount > 0 && (
-                        <span className="bg-therive-accent text-therive-dark text-xs font-medium px-2 py-1 rounded-full">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chat Area */}
-        <div className={`flex-1 flex flex-col ${isMobile && !selectedConversation ? 'hidden' : ''}`}>
-          {activeConversation ? (
-            <>
-              {/* Chat Header - Desktop Only */}
-              {!isMobile && (
-                <div className="border-b border-gray-700/30 p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-therive-dark" />
-                      </div>
-                      {activeConversation.isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900"></div>
-                      )}
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-therive-text">{activeConversation.name}</h2>
-                      <p className="text-xs text-gray-400">
-                        {activeConversation.isOnline ? 'Çevrimiçi' : 'Son görülme: 2 sa önce'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!activeConversation.infoShared && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowInfoShare(true)}
-                      >
-                        <Info className="w-4 h-4 mr-2" />
-                        <span className="hidden lg:inline">Bilgileri Paylaş</span>
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                <AnimatePresence>
-                  {mockMessages.map(message => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex ${message.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] sm:max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                          message.senderId === 'me'
-                            ? 'bg-therive-accent text-therive-dark ml-4'
-                            : 'bg-gray-700 text-therive-text mr-4'
-                        }`}
-                      >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
-                        <div className="flex items-center justify-end gap-1 mt-2">
-                          <Clock className="w-3 h-3 opacity-60" />
-                          <span className="text-xs opacity-60">
-                            {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-
-              {/* Message Input */}
-              <div className="border-t border-gray-700/30 p-4">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <textarea
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Mesajınızı yazın..."
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none resize-none"
-                      rows={1}
-                      style={{ minHeight: '48px', maxHeight: '120px' }}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim()}
-                    size={isMobile ? "default" : "lg"}
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-                
-                {/* Mobile Action Buttons */}
-                {isMobile && activeConversation && !activeConversation.infoShared && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/30">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowInfoShare(true)}
-                      className="w-full"
-                    >
-                      <Info className="w-4 h-4 mr-2" />
-                      Bilgileri Paylaş
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            // Empty state - Show conversation list on mobile
-            <div className={`flex-1 flex items-center justify-center ${isMobile ? 'hidden' : ''}`}>
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Send className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-therive-text mb-3">Mesajlaşmaya başla</h3>
-                <p className="text-gray-400 text-center max-w-sm">
-                  Sol taraftan bir konuşma seçin veya yeni bağlantılar kurun.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Mobile: Show conversation list when no conversation is selected */}
-        {isMobile && !selectedConversation && (
-          <div className="flex-1 flex flex-col">
-            {/* Search */}
-            <div className="p-4 border-b border-gray-700/30">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Konuşma ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-sm text-therive-text focus:border-therive-accent focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Conversations List */}
-            <div className="flex-1 overflow-y-auto">
-              {mockConversations.map(conversation => (
-                <div
-                  key={conversation.id}
-                  onClick={() => handleSelectConversation(conversation.id)}
-                  className="p-4 cursor-pointer hover:bg-gray-700/30 transition-colors border-b border-gray-700/20"
+            {filteredConversations.length === 0 ? (
+              <div className="p-4 text-center text-gray-400">
+                <p>Henüz mesajınız bulunmuyor.</p>
+                <Link 
+                  href="/discover" 
+                  className="text-therive-accent hover:underline"
                 >
-                  <div className="flex items-center gap-3">
+                  Kişiler keşfet
+                </Link>
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => handleChatSelect(conv.id)}
+                  className={`p-4 cursor-pointer hover:bg-gray-700/50 border-b border-gray-700/50 transition-colors ${
+                    selectedChat === conv.id ? 'bg-therive-accent/10 border-therive-accent/20' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
                     <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-therive-accent to-therive-accent-hover rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-therive-dark" />
+                      <div className="w-12 h-12 bg-therive-accent rounded-full flex items-center justify-center">
+                        {conv.avatar ? (
+                          <img src={conv.avatar} alt={conv.name} className="w-12 h-12 rounded-full" />
+                        ) : (
+                          <User className="w-6 h-6 text-therive-dark" />
+                        )}
                       </div>
-                      {conversation.isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-gray-900"></div>
+                      {conv.isOnline && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-gray-800 rounded-full"></div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-therive-text truncate">
-                          {conversation.name}
-                        </h3>
-                        <span className="text-xs text-gray-400">{conversation.lastMessageTime}</span>
-                      </div>
-                      <p className="text-sm text-gray-400 truncate">{conversation.lastMessage}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        {conversation.infoShared && (
-                          <div className="flex items-center gap-1 text-xs text-therive-accent">
-                            <Shield className="w-3 h-3" />
-                            <span>Paylaşıldı</span>
-                          </div>
-                        )}
-                        {conversation.unreadCount > 0 && (
-                          <span className="bg-therive-accent text-therive-dark text-xs font-medium px-2 py-1 rounded-full">
-                            {conversation.unreadCount}
+                        <h3 className="font-semibold text-therive-text truncate">{conv.name}</h3>
+                        {conv.lastMessage && (
+                          <span className="text-xs text-gray-400">
+                            {formatTime(conv.lastMessage.createdAt)}
                           </span>
+                        )}
+                      </div>
+                      
+                      {conv.lastMessage ? (
+                        <p className="text-sm text-gray-400 truncate">
+                          {conv.lastMessage.isFromMe ? 'Sen: ' : ''}
+                          {conv.lastMessage.content}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">Henüz mesaj yok</p>
+                      )}
+                      
+                      <div className="flex items-center gap-2 mt-1">
+                        {conv.unreadCount > 0 && (
+                          <span className="bg-therive-accent text-therive-dark text-xs px-2 py-1 rounded-full">
+                            {conv.unreadCount}
+                          </span>
+                        )}
+                        {conv.infoShared && (
+                          <Shield className="w-4 h-4 text-green-500" />
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Info Share Modal */}
-      {showInfoShare && <InfoShareModal />}
-    </div>
+        {/* Main Chat Area */}
+        <div className={`flex-1 flex flex-col ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
+          {selectedChat && selectedConversation ? (
+            <>
+              {/* Chat Header */}
+              <div className="bg-gray-800/50 border-b border-gray-700 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedChat(null)}
+                      className="md:hidden"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+                    
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-therive-accent rounded-full flex items-center justify-center">
+                        {selectedConversation.avatar ? (
+                          <img src={selectedConversation.avatar} alt={selectedConversation.name} className="w-10 h-10 rounded-full" />
+                        ) : (
+                          <User className="w-5 h-5 text-therive-dark" />
+                        )}
+                      </div>
+                      {selectedConversation.isOnline && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-gray-800 rounded-full"></div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-semibold">{selectedConversation.name}</h3>
+                      <p className="text-xs text-gray-400">
+                        {selectedConversation.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Button variant="ghost" size="sm">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        message.senderId === user?.id
+                          ? 'bg-therive-accent text-therive-dark'
+                          : 'bg-gray-700 text-therive-text'
+                      }`}
+                    >
+                      <p className="break-words">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.senderId === user?.id ? 'text-therive-dark/70' : 'text-gray-400'
+                      }`}>
+                        {formatTime(message.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Message Input */}
+              <div className="bg-gray-800/50 border-t border-gray-700 p-4">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
+                    placeholder="Mesajını yaz..."
+                    rows={1}
+                    className="flex-1 resize-none bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent min-h-[48px] max-h-32"
+                  />
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim() || sending}
+                    className="h-12 w-12 flex-shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Enter ile gönder, Shift+Enter ile yeni satır
+                </p>
+              </div>
+            </>
+          ) : (
+            // No Chat Selected
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Mesajlaşmaya başla</h3>
+                <p className="text-gray-400 mb-4">Soldan bir konuşma seç veya yeni biri ile bağlantı kur</p>
+                <Link href="/discover">
+                  <Button>
+                    Kişiler Keşfet
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  )
+}
+
+export default function MessagesPage() {
+  return (
+    <AuthWrapper requireAuth={true}>
+      <MessagesContent />
+    </AuthWrapper>
   )
 } 

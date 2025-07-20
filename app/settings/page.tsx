@@ -1,594 +1,555 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  ArrowLeft, User, Bell, Shield, Eye, Lock, Mail, 
-  Settings, Star, CreditCard, HelpCircle, LogOut,
-  Save, X, Check, AlertTriangle, Trash2
+  ArrowLeft, User, Lock, Mail, 
+  Save, X, Check, AlertTriangle, Eye, EyeOff
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useAppStore } from '@/lib/store'
+import AuthWrapper from '@/components/AuthWrapper'
 
-interface SettingsData {
-  profile: {
-    displayName: string
-    email: string
-    phone: string
-    bio: string
-    location: string
-    website: string
-  }
-  privacy: {
-    profileVisibility: boolean
-    showOnlineStatus: boolean
-    allowMessageRequests: boolean
-    showEmail: boolean
-    showPhone: boolean
-  }
-  notifications: {
-    emailNotifications: boolean
-    pushNotifications: boolean
-    messageNotifications: boolean
-    connectionNotifications: boolean
-    marketingEmails: boolean
-  }
-  security: {
-    twoFactorEnabled: boolean
-    loginAlerts: boolean
-    sessionTimeout: number
-  }
+interface ProfileData {
+  name: string
+  bio: string
+  intentTags: string[]
+  isPublic: boolean
+  profileLink: string
 }
 
-const mockSettings: SettingsData = {
-  profile: {
-    displayName: 'Demo Kullanıcı',
-    email: 'demo@example.com',
-    phone: '+90 555 123 4567',
-    bio: 'Demo hesabı için test kullanıcısı',
-    location: 'İstanbul, Türkiye',
-    website: 'https://example.com'
-  },
-  privacy: {
-    profileVisibility: true,
-    showOnlineStatus: true,
-    allowMessageRequests: true,
-    showEmail: false,
-    showPhone: false
-  },
-  notifications: {
-    emailNotifications: true,
-    pushNotifications: true,
-    messageNotifications: true,
-    connectionNotifications: true,
-    marketingEmails: false
-  },
-  security: {
-    twoFactorEnabled: false,
-    loginAlerts: true,
-    sessionTimeout: 30
-  }
+interface PasswordData {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsData>(mockSettings)
-  const [activeSection, setActiveSection] = useState('profile')
-  const [hasChanges, setHasChanges] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+interface Notification {
+  type: 'success' | 'error'
+  message: string
+  id: number
+}
 
-  const handleSave = () => {
-    // TODO: Save to API
-    console.log('Saving settings:', settings)
-    setHasChanges(false)
+function SettingsContent() {
+  const { user, token, setUser } = useAppStore()
+  
+  // Profile form state
+  const [profileData, setProfileData] = useState<ProfileData>({
+    name: '',
+    bio: '',
+    intentTags: [],
+    isPublic: true,
+    profileLink: ''
+  })
+
+  // Password form state
+  const [passwordData, setPasswordData] = useState<PasswordData>({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+
+  // UI state
+  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
+  const [loading, setLoading] = useState({
+    profile: false,
+    password: false
+  })
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+
+  // Initialize form data from user
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        bio: user.bio || '',
+        intentTags: user.intentTags || [],
+        isPublic: user.isPublic !== undefined ? user.isPublic : true,
+        profileLink: user.profileLink || ''
+      })
+    }
+  }, [user])
+
+  // Add notification
+  const addNotification = (type: 'success' | 'error', message: string) => {
+    const id = Date.now()
+    setNotifications(prev => [...prev, { type, message, id }])
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id))
+    }, 5000)
   }
 
-  const updateSettings = (section: keyof SettingsData, key: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [key]: value
+  // Remove notification
+  const removeNotification = (id: number) => {
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  // Handle profile update
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!profileData.name.trim()) {
+      addNotification('error', 'Ad alanı zorunludur')
+      return
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, profile: true }))
+
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileData)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Profil güncellenemedi')
       }
-    }))
-    setHasChanges(true)
+
+      // Update user in store
+      setUser(data.user)
+      addNotification('success', 'Profil başarıyla güncellendi')
+      
+    } catch (error: any) {
+      console.error('Profile update error:', error)
+      addNotification('error', error.message || 'Profil güncellenirken hata oluştu')
+    } finally {
+      setLoading(prev => ({ ...prev, profile: false }))
+    }
   }
 
-  const sections = [
-    { id: 'profile', label: 'Profil', icon: User },
-    { id: 'privacy', label: 'Gizlilik', icon: Eye },
-    { id: 'notifications', label: 'Bildirimler', icon: Bell },
-    { id: 'security', label: 'Güvenlik', icon: Shield },
-    { id: 'subscription', label: 'Abonelik', icon: Star },
-    { id: 'account', label: 'Hesap', icon: Settings }
+  // Handle password change
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      addNotification('error', 'Tüm şifre alanları zorunludur')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      addNotification('error', 'Yeni şifreler eşleşmiyor')
+      return
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      addNotification('error', 'Yeni şifre en az 8 karakter olmalıdır')
+      return
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, password: true }))
+
+      const response = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(passwordData)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Şifre değiştirilemedi')
+      }
+
+      // Clear password form
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+
+      addNotification('success', 'Şifre başarıyla güncellendi')
+      
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      addNotification('error', error.message || 'Şifre değiştirilirken hata oluştu')
+    } finally {
+      setLoading(prev => ({ ...prev, password: false }))
+    }
+  }
+
+  // Handle intent tag changes
+  const handleTagAdd = (tag: string) => {
+    if (tag && !profileData.intentTags.includes(tag)) {
+      setProfileData(prev => ({
+        ...prev,
+        intentTags: [...prev.intentTags, tag]
+      }))
+    }
+  }
+
+  const handleTagRemove = (tag: string) => {
+    setProfileData(prev => ({
+      ...prev,
+      intentTags: prev.intentTags.filter(t => t !== tag)
+    }))
+  }
+
+  const availableTags = [
+    'yatirim-ariyorum',
+    'yatirimci-ariyorum', 
+    'partner-ariyorum',
+    'mentor-ariyorum',
+    'is-ariyorum',
+    'calisan-ariyorum',
+    'freelance',
+    'startup',
+    'teknoloji',
+    'fintech'
   ]
 
-  const DeleteAccountModal = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-gray-800 border border-red-500/50 rounded-xl p-6 w-full max-w-md"
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-8 h-8 text-red-400" />
-          <div>
-            <h3 className="text-xl font-semibold text-therive-text">Hesabı Sil</h3>
-            <p className="text-sm text-gray-400">Bu işlem geri alınamaz</p>
-          </div>
-        </div>
-        
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6">
-          <h4 className="text-red-400 font-medium mb-2">Dikkat!</h4>
-          <ul className="text-sm text-red-300/80 space-y-1">
-            <li>• Tüm profil bilgileriniz silinecek</li>
-            <li>• Mesaj geçmişiniz kaybolacak</li>
-            <li>• Bağlantılarınız kesilecek</li>
-            <li>• Bu işlem geri alınamaz</li>
-          </ul>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Onaylamak için "HESABI SİL" yazın:
-          </label>
-          <input
-            type="text"
-            placeholder="HESABI SİL"
-            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-therive-text mb-4"
-          />
-        </div>
-
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setShowDeleteModal(false)}
-            className="flex-1"
-          >
-            İptal
-          </Button>
-          <Button
-            onClick={() => {
-              setShowDeleteModal(false)
-              // TODO: Delete account
-            }}
-            className="flex-1 bg-red-600 hover:bg-red-700"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Hesabı Sil
-          </Button>
-        </div>
-      </motion.div>
-    </div>
-  )
-
   return (
-    <main className="min-h-screen bg-therive-dark">
+    <main className="min-h-screen bg-therive-dark text-therive-text">
+      {/* Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        <AnimatePresence>
+          {notifications.map((notification) => (
+            <motion.div
+              key={notification.id}
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 100 }}
+              className={`p-4 rounded-lg shadow-lg flex items-center gap-3 max-w-sm ${
+                notification.type === 'success' 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-red-600 text-white'
+              }`}
+            >
+              {notification.type === 'success' ? (
+                <Check className="w-5 h-5" />
+              ) : (
+                <AlertTriangle className="w-5 h-5" />
+              )}
+              <p className="flex-1 text-sm">{notification.message}</p>
+              <button 
+                onClick={() => removeNotification(notification.id)}
+                className="text-white/70 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Header */}
-      <header className="border-b border-gray-700/50 bg-gray-900/50 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div className="bg-gray-800/50 border-b border-gray-700">
+        <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-4">
               <Link 
                 href="/dashboard"
-                className="text-therive-accent hover:text-therive-accent-hover"
+                className="inline-flex items-center gap-2 text-therive-accent hover:text-therive-accent-hover"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" />
+                Dashboard
               </Link>
-              <h1 className="text-lg sm:text-xl font-bold text-therive-text">
-                Hesap Ayarları
-              </h1>
+              <h1 className="text-2xl font-bold">Hesap Ayarları</h1>
             </div>
-            {hasChanges && (
-              <Button onClick={handleSave} size="sm">
-                <Save className="w-4 h-4 mr-2" />
-                Değişiklikleri Kaydet
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Settings Navigation */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-4 sticky top-24">
-              <nav className="space-y-2">
-                {sections.map(section => {
-                  const Icon = section.icon
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                        activeSection === section.id
-                          ? 'bg-therive-accent text-therive-dark'
-                          : 'text-gray-300 hover:text-therive-text hover:bg-gray-700/30'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="font-medium">{section.label}</span>
-                    </button>
-                  )
-                })}
-              </nav>
-            </div>
-          </div>
-
-          {/* Settings Content */}
-          <div className="lg:col-span-3">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSection}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                {activeSection === 'profile' && (
-                  <>
-                    <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                      <h2 className="text-xl font-semibold text-therive-text mb-6">Profil Bilgileri</h2>
-                      <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Görünen Ad
-                            </label>
-                            <input
-                              type="text"
-                              value={settings.profile.displayName}
-                              onChange={(e) => updateSettings('profile', 'displayName', e.target.value)}
-                              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              E-posta
-                            </label>
-                            <input
-                              type="email"
-                              value={settings.profile.email}
-                              onChange={(e) => updateSettings('profile', 'email', e.target.value)}
-                              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Telefon
-                            </label>
-                            <input
-                              type="tel"
-                              value={settings.profile.phone}
-                              onChange={(e) => updateSettings('profile', 'phone', e.target.value)}
-                              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Konum
-                            </label>
-                            <input
-                              type="text"
-                              value={settings.profile.location}
-                              onChange={(e) => updateSettings('profile', 'location', e.target.value)}
-                              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Bio
-                          </label>
-                          <textarea
-                            value={settings.profile.bio}
-                            onChange={(e) => updateSettings('profile', 'bio', e.target.value)}
-                            rows={4}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none resize-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Website
-                          </label>
-                          <input
-                            type="url"
-                            value={settings.profile.website}
-                            onChange={(e) => updateSettings('profile', 'website', e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                            placeholder="https://example.com"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {activeSection === 'privacy' && (
-                  <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                    <h2 className="text-xl font-semibold text-therive-text mb-6">Gizlilik Ayarları</h2>
-                    <div className="space-y-6">
-                      {[
-                        { key: 'profileVisibility', label: 'Profil Görünürlüğü', desc: 'Profiliniz keşfet sayfasında görünsün' },
-                        { key: 'showOnlineStatus', label: 'Çevrimiçi Durum', desc: 'Online olduğunuzda diğer kullanıcılara gösterilsin' },
-                        { key: 'allowMessageRequests', label: 'Mesaj İstekleri', desc: 'Bağlantınız olmayan kişilerden mesaj alın' },
-                        { key: 'showEmail', label: 'E-posta Göster', desc: 'Bağlantılarınıza e-posta adresinizi gösterin' },
-                        { key: 'showPhone', label: 'Telefon Göster', desc: 'Bağlantılarınıza telefon numaranızı gösterin' }
-                      ].map(setting => (
-                        <div key={setting.key} className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">{setting.label}</h3>
-                            <p className="text-xs text-gray-400">{setting.desc}</p>
-                          </div>
-                          <button
-                            onClick={() => updateSettings('privacy', setting.key, !settings.privacy[setting.key as keyof typeof settings.privacy])}
-                            className={`w-12 h-6 rounded-full flex items-center px-1 transition-colors ${
-                              settings.privacy[setting.key as keyof typeof settings.privacy] ? 'bg-therive-accent' : 'bg-gray-600'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full transform transition-transform ${
-                              settings.privacy[setting.key as keyof typeof settings.privacy] ? 'translate-x-6' : 'translate-x-0'
-                            }`}></div>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeSection === 'notifications' && (
-                  <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                    <h2 className="text-xl font-semibold text-therive-text mb-6">Bildirim Ayarları</h2>
-                    <div className="space-y-6">
-                      {[
-                        { key: 'emailNotifications', label: 'E-posta Bildirimleri', desc: 'Önemli güncellemeler için e-posta alın' },
-                        { key: 'pushNotifications', label: 'Push Bildirimleri', desc: 'Tarayıcı bildirimleri gönderin' },
-                        { key: 'messageNotifications', label: 'Mesaj Bildirimleri', desc: 'Yeni mesajlar için bildirim' },
-                        { key: 'connectionNotifications', label: 'Bağlantı Bildirimleri', desc: 'Yeni bağlantı istekleri için bildirim' },
-                        { key: 'marketingEmails', label: 'Pazarlama E-postaları', desc: 'Özellikler ve güncellemeler hakkında e-posta' }
-                      ].map(setting => (
-                        <div key={setting.key} className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">{setting.label}</h3>
-                            <p className="text-xs text-gray-400">{setting.desc}</p>
-                          </div>
-                          <button
-                            onClick={() => updateSettings('notifications', setting.key, !settings.notifications[setting.key as keyof typeof settings.notifications])}
-                            className={`w-12 h-6 rounded-full flex items-center px-1 transition-colors ${
-                              settings.notifications[setting.key as keyof typeof settings.notifications] ? 'bg-therive-accent' : 'bg-gray-600'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full transform transition-transform ${
-                              settings.notifications[setting.key as keyof typeof settings.notifications] ? 'translate-x-6' : 'translate-x-0'
-                            }`}></div>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeSection === 'security' && (
-                  <div className="space-y-6">
-                    <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                      <h2 className="text-xl font-semibold text-therive-text mb-6">Güvenlik Ayarları</h2>
-                      <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">İki Faktörlü Kimlik Doğrulama</h3>
-                            <p className="text-xs text-gray-400">Hesabınız için ekstra güvenlik katmanı</p>
-                          </div>
-                          <Button 
-                            variant={settings.security.twoFactorEnabled ? "outline" : "default"}
-                            size="sm"
-                            onClick={() => updateSettings('security', 'twoFactorEnabled', !settings.security.twoFactorEnabled)}
-                          >
-                            {settings.security.twoFactorEnabled ? 'Devre Dışı Bırak' : 'Etkinleştir'}
-                          </Button>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">Giriş Uyarıları</h3>
-                            <p className="text-xs text-gray-400">Yeni cihaz girişlerinde e-posta gönder</p>
-                          </div>
-                          <button
-                            onClick={() => updateSettings('security', 'loginAlerts', !settings.security.loginAlerts)}
-                            className={`w-12 h-6 rounded-full flex items-center px-1 transition-colors ${
-                              settings.security.loginAlerts ? 'bg-therive-accent' : 'bg-gray-600'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full transform transition-transform ${
-                              settings.security.loginAlerts ? 'translate-x-6' : 'translate-x-0'
-                            }`}></div>
-                          </button>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Oturum Zaman Aşımı (dakika)
-                          </label>
-                          <select
-                            value={settings.security.sessionTimeout}
-                            onChange={(e) => updateSettings('security', 'sessionTimeout', parseInt(e.target.value))}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                          >
-                            <option value={15}>15 dakika</option>
-                            <option value={30}>30 dakika</option>
-                            <option value={60}>1 saat</option>
-                            <option value={120}>2 saat</option>
-                            <option value={0}>Asla</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                      <h2 className="text-xl font-semibold text-therive-text mb-4">Şifre Değişikliği</h2>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Mevcut Şifre
-                          </label>
-                          <input
-                            type="password"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Yeni Şifre
-                          </label>
-                          <input
-                            type="password"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Yeni Şifre (Tekrar)
-                          </label>
-                          <input
-                            type="password"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-therive-text focus:border-therive-accent focus:outline-none"
-                          />
-                        </div>
-                        <Button>
-                          <Lock className="w-4 h-4 mr-2" />
-                          Şifreyi Güncelle
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeSection === 'subscription' && (
-                  <div className="space-y-6">
-                    <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 rounded-2xl p-6">
-                      <div className="flex items-center gap-4 mb-4">
-                        <Star className="w-8 h-8 text-yellow-400" />
-                        <div>
-                          <h2 className="text-xl font-semibold text-therive-text">Premium Üyelik</h2>
-                          <p className="text-sm text-gray-400">Tüm özelliklerin kilidini açın</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div>
-                          <h3 className="font-medium text-therive-text mb-3">Premium Özellikler:</h3>
-                          <ul className="space-y-2 text-sm text-gray-300">
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-400" />
-                              Sınırsız hashtag sabitleme
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-400" />
-                              Gelişmiş filtreleme
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-400" />
-                              Öncelikli görünürlük
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-400" />
-                              Detaylı istatistikler
-                            </li>
-                          </ul>
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-therive-text mb-3">Mevcut Plan:</h3>
-                          <div className="bg-gray-700/50 rounded-lg p-4">
-                            <div className="text-lg font-semibold text-therive-text">Ücretsiz Plan</div>
-                            <div className="text-sm text-gray-400">Temel özellikler</div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <Button className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 hover:from-yellow-500 hover:to-yellow-600">
-                        <Star className="w-4 h-4 mr-2" />
-                        Premium'a Yükselt
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {activeSection === 'account' && (
-                  <div className="space-y-6">
-                    <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                      <h2 className="text-xl font-semibold text-therive-text mb-6">Hesap İşlemleri</h2>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">Verileri Dışa Aktar</h3>
-                            <p className="text-xs text-gray-400">Tüm hesap verilerinizi indirin</p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            <Mail className="w-4 h-4 mr-2" />
-                            Dışa Aktar
-                          </Button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg">
-                          <div>
-                            <h3 className="text-sm font-medium text-therive-text">Hesabı Devre Dışı Bırak</h3>
-                            <p className="text-xs text-gray-400">Hesabınızı geçici olarak gizleyin</p>
-                          </div>
-                          <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400">
-                            Devre Dışı Bırak
-                          </Button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                          <div>
-                            <h3 className="text-sm font-medium text-red-400">Hesabı Kalıcı Olarak Sil</h3>
-                            <p className="text-xs text-red-300/80">Bu işlem geri alınamaz</p>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => setShowDeleteModal(true)}
-                            className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Hesabı Sil
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-2xl p-6">
-                      <h2 className="text-xl font-semibold text-therive-text mb-4">Yardım & Destek</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Link href="/help">
-                          <Button variant="outline" className="w-full justify-start">
-                            <HelpCircle className="w-4 h-4 mr-2" />
-                            Yardım Merkezi
-                          </Button>
-                        </Link>
-                        <Link href="/contact">
-                          <Button variant="outline" className="w-full justify-start">
-                            <Mail className="w-4 h-4 mr-2" />
-                            İletişim
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* Delete Account Modal */}
-      {showDeleteModal && <DeleteAccountModal />}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Tab Navigation */}
+        <div className="flex gap-1 mb-8 bg-gray-800/30 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`px-6 py-3 rounded-md transition-colors flex items-center gap-2 ${
+              activeTab === 'profile'
+                ? 'bg-therive-accent text-therive-dark'
+                : 'text-gray-400 hover:text-therive-text'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Profil Bilgileri
+          </button>
+          <button
+            onClick={() => setActiveTab('password')}
+            className={`px-6 py-3 rounded-md transition-colors flex items-center gap-2 ${
+              activeTab === 'password'
+                ? 'bg-therive-accent text-therive-dark'
+                : 'text-gray-400 hover:text-therive-text'
+            }`}
+          >
+            <Lock className="w-4 h-4" />
+            Şifre Değiştir
+          </button>
+        </div>
+
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-800/50 border border-gray-700 rounded-lg p-6"
+          >
+            <h2 className="text-xl font-bold mb-6">Profil Bilgileri</h2>
+            
+            <form onSubmit={handleProfileUpdate} className="space-y-6">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Ad Soyad *
+                </label>
+                <input
+                  type="text"
+                  value={profileData.name}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent"
+                  placeholder="Adınız ve soyadınız"
+                  required
+                />
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Hakkında
+                </label>
+                <textarea
+                  value={profileData.bio}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+                  rows={4}
+                  maxLength={500}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent resize-none"
+                  placeholder="Kendinizden kısaca bahsedin..."
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {profileData.bio.length}/500 karakter
+                </p>
+              </div>
+
+              {/* Profile Link */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Profil Linki
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 bg-gray-600 border border-r-0 border-gray-600 rounded-l-lg text-gray-300 text-sm">
+                    therive.com/
+                  </span>
+                  <input
+                    type="text"
+                    value={profileData.profileLink}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, profileLink: e.target.value }))}
+                    className="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded-r-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent"
+                    placeholder="kendi-linkiniz"
+                  />
+                </div>
+              </div>
+
+              {/* Intent Tags */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  İlgi Alanları
+                </label>
+                
+                {/* Selected Tags */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {profileData.intentTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="bg-therive-accent/20 text-therive-accent px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => handleTagRemove(tag)}
+                        className="text-therive-accent hover:text-red-400"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Available Tags */}
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400">Eklemek için tıklayın:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags
+                      .filter(tag => !profileData.intentTags.includes(tag))
+                      .map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleTagAdd(tag)}
+                          className="bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1 rounded-full text-sm transition-colors"
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Visibility */}
+              <div>
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={profileData.isPublic}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, isPublic: e.target.checked }))}
+                    className="rounded border-gray-600 text-therive-accent focus:ring-therive-accent focus:ring-offset-0 bg-gray-700"
+                  />
+                  <span className="text-sm">Profilim herkese açık olsun</span>
+                </label>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end">
+                <Button 
+                  type="submit" 
+                  disabled={loading.profile}
+                  loading={loading.profile}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {loading.profile ? 'Kaydediliyor...' : 'Profili Kaydet'}
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+
+        {/* Password Tab */}
+        {activeTab === 'password' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-800/50 border border-gray-700 rounded-lg p-6"
+          >
+            <h2 className="text-xl font-bold mb-6">Şifre Değiştir</h2>
+            
+            <form onSubmit={handlePasswordChange} className="space-y-6">
+              {/* Current Password */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Mevcut Şifre *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    className="w-full px-4 py-3 pr-12 bg-gray-700 border border-gray-600 rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent"
+                    placeholder="Mevcut şifreniz"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-therive-text"
+                  >
+                    {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Yeni Şifre *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    className="w-full px-4 py-3 pr-12 bg-gray-700 border border-gray-600 rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent"
+                    placeholder="Yeni şifreniz"
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-therive-text"
+                  >
+                    {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  En az 8 karakter olmalıdır
+                </p>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Yeni Şifre Tekrar *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    className={`w-full px-4 py-3 pr-12 bg-gray-700 border rounded-lg text-therive-text placeholder-gray-400 focus:ring-2 focus:ring-therive-accent focus:border-transparent ${
+                      passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword
+                        ? 'border-red-500' 
+                        : 'border-gray-600'
+                    }`}
+                    placeholder="Yeni şifrenizi tekrar girin"
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-therive-text"
+                  >
+                    {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                  <p className="text-xs text-red-400 mt-1">
+                    Şifreler eşleşmiyor
+                  </p>
+                )}
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end">
+                <Button 
+                  type="submit" 
+                  disabled={loading.password}
+                  loading={loading.password}
+                  className="flex items-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  {loading.password ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </div>
     </main>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <AuthWrapper requireAuth={true}>
+      <SettingsContent />
+    </AuthWrapper>
   )
 } 

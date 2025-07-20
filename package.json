@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm install && prisma generate && prisma db push && next build",
+    "build": "prisma generate && prisma db push && next build",
     "start": "next start",
     "lint": "next lint",
-    "railway:build": "npm ci --force && prisma generate && prisma db push && next build",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -16,7 +15,6 @@
   "dependencies": {
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
-    "@next/font": "^14.0.4",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-slot": "^1.0.2",
     "bcryptjs": "^2.4.3",
